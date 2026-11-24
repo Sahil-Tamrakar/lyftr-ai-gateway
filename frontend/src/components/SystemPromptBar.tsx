@@ -1,64 +1,50 @@
-import { useState } from "react";
-import { ChevronDownIcon, TerminalIcon } from "./icons";
+import React, { useState } from 'react';
 
-interface SystemPromptBarProps {
-  value: string;
-  onChange: (value: string) => void;
+interface Props {
+  systemPrompt: string;
+  setSystemPrompt: (val: string) => void;
 }
 
-export function SystemPromptBar({ value, onChange }: SystemPromptBarProps) {
-  const [open, setOpen] = useState(true);
-  const isActive = value.trim().length > 0;
+export const SystemPromptBar: React.FC<Props> = ({ systemPrompt, setSystemPrompt }) => {
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-ink-900/60 backdrop-blur">
+    <div className="mb-6 rounded-xl border border-[#2d2d2d] bg-[#1a1a1a]/80 backdrop-blur-sm overflow-hidden transition-all">
       <button
-        type="button"
-        onClick={() => setOpen((previous) => !previous)}
-        aria-expanded={open}
-        aria-controls="system-prompt-body"
-        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left transition hover:bg-white/[0.02]"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-[#a1a1aa] hover:text-[#ececec] hover:bg-[#242424] transition-colors"
       >
-        <TerminalIcon className="h-3.5 w-3.5 text-slate-500" />
-        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-          System prompt
-        </span>
-        <span
-          className={[
-            "rounded-full border px-1.5 py-px text-[9px] uppercase tracking-wider",
-            isActive
-              ? "border-emerald-400/25 bg-emerald-400/[0.07] text-emerald-300"
-              : "border-white/10 bg-white/[0.03] text-slate-500",
-          ].join(" ")}
+        <div className="flex items-center gap-2 font-mono">
+          <svg className="w-3.5 h-3.5 text-[#10a37f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          <span className="font-semibold tracking-wide uppercase text-[11px]">System Prompt</span>
+          <span className="px-1.5 py-0.2 rounded bg-[#10a37f]/20 text-[#10a37f] text-[10px] font-bold">
+            ACTIVE
+          </span>
+        </div>
+        <svg
+          className={`w-3.5 h-3.5 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
         >
-          {isActive ? "active" : "optional"}
-        </span>
-        <ChevronDownIcon
-          className={[
-            "ml-auto h-3.5 w-3.5 text-slate-500 transition-transform duration-200",
-            open ? "rotate-180" : "",
-          ].join(" ")}
-        />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
 
-      {open ? (
-        <div id="system-prompt-body" className="border-t border-white/[0.06] px-3.5 py-3">
+      {isOpen && (
+        <div className="p-3 border-t border-[#262626]">
           <textarea
             data-testid="system-prompt-input"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
             rows={2}
-            spellCheck={false}
-            placeholder="You are a senior engineer. Answer concisely with production-ready guidance."
-            aria-label="System prompt"
-            className="block w-full resize-y rounded-lg border border-white/[0.07] bg-black/25 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-200 placeholder:text-slate-600 focus:border-sky-400/30 focus:outline-none focus:ring-1 focus:ring-sky-400/20"
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            placeholder="Set session system instructions..."
+            className="w-full bg-[#121212] border border-[#2e2e2e] focus:border-[#10a37f] rounded-lg p-2.5 text-xs font-mono text-[#d4d4d8] placeholder-[#52525b] outline-none transition-colors resize-none"
           />
-          <p className="mt-1.5 text-[10px] leading-relaxed text-slate-600">
-            Applied to every turn in this session and persisted only after a successful
-            reply. Clear the field to remove it.
-          </p>
         </div>
-      ) : null}
+      )}
     </div>
   );
-}
+};
