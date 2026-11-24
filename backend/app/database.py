@@ -120,6 +120,44 @@ class Database:
         ) as cursor:
             return list(await cursor.fetchall())
 
+    async def list_sessions(self, limit: int = 50) -> list[aiosqlite.Row]:
+        """Conversation summaries, most recently active first.
+
+        The title is the first visible user message; hidden ``system`` rows are
+        counted neither in ``message_count`` nor as the title.
+        """
+        async with self.conn.execute(
+            """
+            SELECT
+                m.session_id,
+                COALESCE(
+                    (
+                        SELECT content FROM messages t
+                        WHERE t.session_id = m.session_id AND t.role = 'user'
+                        ORDER BY t.id ASC
+                        LIMIT 1
+                    ),
+                    ''
+                ) AS title,
+                (
+                    SELECT content FROM messages s
+                    WHERE s.session_id = m.session_id AND s.role = 'system'
+                    ORDER BY s.id DESC
+                    LIMIT 1
+                ) AS system_prompt,
+                MAX(m.created_at) AS updated_at,
+                COUNT(*) AS message_count,
+                MAX(m.id) AS last_id
+            FROM messages m
+            WHERE m.role != 'system'
+            GROUP BY m.session_id
+            ORDER BY last_id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ) as cursor:
+            return list(await cursor.fetchall())
+
     async def get_system_prompt(self, session_id: str) -> str | None:
         async with self.conn.execute(
             """

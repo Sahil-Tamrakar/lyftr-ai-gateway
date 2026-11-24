@@ -74,3 +74,15 @@ class SessionMessage(BaseModel):
 class SessionMessagesResponse(BaseModel):
     session_id: str
     messages: list[SessionMessage]
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    title: str
+    updated_at: str
+    message_count: int
+    system_prompt: str | None = None
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionSummary]

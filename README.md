@@ -248,6 +248,17 @@ curl -s http://localhost:8000/sessions/s-demo/messages
 # role/content oldest-first, assistant entries include metadata, no system prompt
 ```
 
+**Session list**
+
+```bash
+curl -s http://localhost:8000/sessions
+# newest first: session_id, first user message as title, message_count,
+# updated_at, and the stored system_prompt
+```
+
+The console loads this list into the sidebar under **Recent Chats**; clicking an
+entry replays that conversation and restores its system prompt.
+
 **In the UI**
 
 - `chat-input`, `send-button` and `system-prompt-input` drive the session; the
@@ -264,7 +275,7 @@ curl -s http://localhost:8000/sessions/s-demo/messages
 - Editor/tooling: VS Code-style workspace driven by **Codebuff** (Buffy running
   on DeepSeek V4.1 Flash Slow).
 - Verification environment: Python 3.12.1, Node 24.18.0 / npm 12.2.3 on
-  Windows. `pytest` (26 tests) and the production frontend build (`tsc` +
+  Windows. `pytest` (28 tests) and the production frontend build (`tsc` +
   `vite build`) were executed locally.
 - The Docker Compose stack was built and run on the authoring machine
   (`docker compose up --build`); both services started healthy, the UI was

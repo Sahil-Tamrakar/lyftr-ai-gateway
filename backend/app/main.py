@@ -24,8 +24,10 @@ from .schemas import (
     ChatRequest,
     ChatResponse,
     MessageMetadata,
+    SessionListResponse,
     SessionMessage,
     SessionMessagesResponse,
+    SessionSummary,
 )
 
 logging.basicConfig(
@@ -121,6 +123,24 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         session_id=payload.session_id,
         reply=outcome.reply,
         metadata=MessageMetadata(**metadata),
+    )
+
+
+@router.get("/sessions", response_model=SessionListResponse)
+async def list_sessions(request: Request) -> SessionListResponse:
+    db: Database = request.app.state.db
+    rows = await db.list_sessions()
+    return SessionListResponse(
+        sessions=[
+            SessionSummary(
+                session_id=row["session_id"],
+                title=row["title"],
+                updated_at=row["updated_at"],
+                message_count=row["message_count"],
+                system_prompt=row["system_prompt"],
+            )
+            for row in rows
+        ]
     )
 
 

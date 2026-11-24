@@ -1,10 +1,46 @@
-import { ChatRequestPayload, ChatResponsePayload, HealthStatus } from '../types/chat';
+import {
+  ChatRequestPayload,
+  ChatResponsePayload,
+  HealthStatus,
+  SessionMessagesResponse,
+  SessionSummary,
+} from '../types/chat';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export async function checkHealth(): Promise<HealthStatus> {
   const res = await fetch(`${API_BASE_URL}/health`);
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSessions(): Promise<SessionSummary[]> {
+  const res = await fetch(`${API_BASE_URL}/sessions`);
+  if (!res.ok) throw new Error(`Could not load sessions: ${res.status}`);
+  const data = await res.json();
+  return data.sessions;
+}
+
+export async function fetchSessionMessages(
+  sessionId: string
+): Promise<SessionMessagesResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/sessions/${encodeURIComponent(sessionId)}/messages`
+  );
+
+  if (!res.ok) {
+    let errorDetail = `Could not load session (${res.status})`;
+    try {
+      const errJson = await res.json();
+      errorDetail = errJson.detail || errorDetail;
+    } catch {
+      // fallback to status text
+    }
+    const error: any = new Error(errorDetail);
+    error.status = res.status;
+    throw error;
+  }
+
   return res.json();
 }
 

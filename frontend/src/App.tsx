@@ -8,7 +8,9 @@ import { useChat } from './hooks/useChat';
 export function App() {
   const {
     sessionId,
+    sessions,
     initNewSession,
+    selectSession,
     messages,
     systemPrompt,
     setSystemPrompt,
@@ -19,7 +21,13 @@ export function App() {
 
   return (
     <div className="flex h-screen bg-[#212121] text-[#ececec] overflow-hidden antialiased">
-      <Sidebar sessionId={sessionId} onNewSession={initNewSession} health={health} />
+      <Sidebar
+        sessionId={sessionId}
+        sessions={sessions}
+        onNewSession={initNewSession}
+        onSelectSession={selectSession}
+        health={health}
+      />
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
         <header className="h-14 border-b border-[#2d2d2d] flex items-center justify-between px-6 bg-[#212121]/90 backdrop-blur-sm z-10 shrink-0">

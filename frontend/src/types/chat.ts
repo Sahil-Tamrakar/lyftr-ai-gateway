@@ -33,3 +33,22 @@ export interface HealthStatus {
   keys_configured: number;
   cache_enabled: boolean;
 }
+
+export interface SessionSummary {
+  session_id: string;
+  title: string;
+  updated_at: string;
+  message_count: number;
+  system_prompt: string | null;
+}
+
+export interface SessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: MessageMetadata;
+}
+
+export interface SessionMessagesResponse {
+  session_id: string;
+  messages: SessionMessage[];
+}
