@@ -39,7 +39,15 @@ A production-shaped LLM gateway and observability console.
 
 ## 1. Live URLS
 
-The compose stack serves the application at:
+Public deployment:
+
+| Surface | URL |
+| --- | --- |
+| Console UI | https://lyftr-ai-gateway-frontend.vercel.app/ |
+| API | https://lyftr-ai-gateway.onrender.com |
+| Health | https://lyftr-ai-gateway.onrender.com/health |
+
+The compose stack also serves the application locally at:
 
 | Surface | URL |
 | --- | --- |
@@ -47,10 +55,6 @@ The compose stack serves the application at:
 | API | http://localhost:8000 |
 | Health | http://localhost:8000/health |
 | OpenAPI docs | http://localhost:8000/docs |
-
-No public deployment is bundled with this repository. To publish it, deploy the
-two images and set `VITE_API_BASE_URL` to the public backend URL at frontend
-build time (and add the frontend origin to `ALLOWED_ORIGINS`).
 
 ## 2. Run locally: with Docker and without
 
