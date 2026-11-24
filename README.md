@@ -3,11 +3,10 @@
 A production-shaped LLM gateway and observability console.
 
 - **Backend** — FastAPI + LiteLLM + `aiosqlite`, with an ordered key pool,
-  request-scoped failover, deterministic response caching, per-request token
+  request-scoped failover, LiteLLM-backed response caching, per-request token
   accounting and strict JSON error envelopes.
 - **Frontend** — React + Vite + TypeScript + Tailwind console that renders
-  markdown with syntax highlighting and surfaces routing metadata for every
-  assistant reply.
+  assistant replies and surfaces routing metadata for every turn.
 - **Infrastructure** — multi-stage Dockerfiles, Docker Compose with a named
   SQLite volume, and a Makefile.
 
@@ -27,7 +26,8 @@ A production-shaped LLM gateway and observability console.
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx
-│   │   ├── api.ts
+│   │   ├── api/client.ts
+│   │   ├── hooks/useChat.ts
 │   │   └── components/
 │   ├── Dockerfile           # node builder -> nginx runtime, port 3000
 │   └── nginx.conf
@@ -132,21 +132,24 @@ python -m pytest -q
 
 ### Caching
 
-- LiteLLM's built-in cache is enabled at startup (`litellm.cache = Cache(...)`),
-  with `LITELLM_CACHE_TYPE=in-memory` by default.
-- Layered in front of it is a deterministic, bounded LRU cache owned by the
-  gateway so a hit can always be reported precisely. Its key is
-  `sha256(model + canonical-JSON(full message array))`, where the message array
-  is the effective system prompt + persisted history + the new user message.
-- A hit returns the stored reply, the stored `input_tokens` / `output_tokens`,
-  `resolution_source: "LLM_CACHE"`, `key_id: null`, `fallback_attempts: 0`, and
-  does not call a provider.
+- Caching is delegated to LiteLLM's built-in cache. At startup the app sets
+  `litellm.cache = litellm.Cache(type=...)`, with
+  `LITELLM_CACHE_TYPE=local` (in-memory) by default. Any cache backend
+  supported by the installed LiteLLM version (for example `redis` or `s3`) can
+  be selected with the same variable; unsupported values fall back to `local`.
+- LiteLLM derives a deterministic cache key from the model plus the complete
+  message array (system prompt + persisted history + new user message).
+- A cache hit is detected from LiteLLM's response metadata:
+  `response._hidden_params["cache_hit"] == True`. It returns the cached reply
+  and usage as `resolution_source: "LLM_CACHE"`, `key_id: null`,
+  `fallback_attempts: 0`, without making an upstream provider call.
 - Because history is part of the key, repeating the same prompt in the *same*
   session is intentionally a miss (the history changed). Cache hits are
   demonstrated with a fresh `session_id` and an identical prompt.
-- Requests carrying `X-Simulate-Failure` bypass the cache lookup **and** are
-  never written to the cache. That keeps failover demos reproducible: a clean
-  request after a simulated one still hits `key_1` live.
+- Requests carrying `X-Simulate-Failure` pass
+  `cache={"no-cache": True, "no-store": True}` to LiteLLM, so they neither
+  read an existing entry nor write a new one. That keeps failover demos
+  reproducible: a clean request after a simulated one still hits `key_1` live.
 
 ### SQLite session storage
 
@@ -252,7 +255,7 @@ curl -s http://localhost:8000/sessions/s-demo/messages
 - Each assistant card is `assistant-message` and contains
   `meta-source` (`LIVE_INFERENCE` / `LLM_CACHE`), `meta-model`,
   `meta-latency` (`812 ms`), `meta-input-tokens`, `meta-output-tokens`, plus
-  `meta-key-id` and a fallback badge when routing skipped keys.
+  the serving key identity and a fallback badge when routing skipped keys.
 - Validation and outage failures appear as readable red alert bubbles inside
   the stream (HTTP status included), not as console errors.
 
@@ -261,21 +264,24 @@ curl -s http://localhost:8000/sessions/s-demo/messages
 - Editor/tooling: VS Code-style workspace driven by **Codebuff** (Buffy running
   on DeepSeek V4.1 Flash Slow).
 - Verification environment: Python 3.12.1, Node 24.18.0 / npm 12.2.3 on
-  Windows. `pytest` (23 tests) and the production frontend build (`tsc` +
+  Windows. `pytest` (26 tests) and the production frontend build (`tsc` +
   `vite build`) were executed locally.
-- Docker was not installed on the authoring machine, so `docker compose up`
-  was not executed here; the Dockerfiles, compose file and Makefile are
-  provided and written for the documented ports/volumes.
+- The Docker Compose stack was built and run on the authoring machine
+  (`docker compose up --build`); both services started healthy, the UI was
+  served on port 3000 and the API on port 8000. The deployments linked in
+  Section 1 are live.
 
 ## 6. Bonus features (if any): what you added beyond the requirements and why
 
 - **Cache-bypass invariant for simulations** — simulated requests neither read
   nor write the cache, which guarantees a failover demo cannot accidentally
   turn into a cache hit and makes tests deterministic.
-- **Bounded LRU response cache** (2048 entries) — prevents unbounded memory
-  growth in a long-running process while keeping hit semantics exact.
-- **Extra routing telemetry in the UI** — `meta-key-id` and a `fallback ×N`
-  badge make the key pool observable, not just the resolution source.
+- **LiteLLM-native caching** — the built-in `Cache` is the single source of
+  truth for hits, so the gateway reports exactly what LiteLLM resolved rather
+  than maintaining a second cache with divergent semantics.
+- **Extra routing telemetry in the UI** — the serving key identity and a
+  `fallback ×N` badge make the key pool observable, not just the resolution
+  source.
 - **Copy affordances** — copy reply and copy session id buttons for quick
   report/demo pasting.
 - **Health-aware header** — polls `/health` and shows API state, key count and

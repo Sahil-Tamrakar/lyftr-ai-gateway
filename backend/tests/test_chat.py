@@ -109,6 +109,28 @@ def test_system_prompt_persists_and_can_be_cleared(client, provider):
     assert all(message["role"] != "system" for message in history["messages"])
 
 
+def test_explicit_new_system_prompt_overrides_stored_prompt(client, provider):
+    client.post(
+        "/chat",
+        json={"session_id": "s-sys-override", "message": "one", "system_prompt": "Persona A"},
+    )
+    client.post(
+        "/chat",
+        json={"session_id": "s-sys-override", "message": "two", "system_prompt": "Persona B"},
+    )
+    assert provider.calls[1]["messages"][0] == {
+        "role": "system",
+        "content": "Persona B",
+    }
+
+    # Omitting the field keeps the newly stored prompt.
+    client.post("/chat", json={"session_id": "s-sys-override", "message": "three"})
+    assert provider.calls[2]["messages"][0] == {
+        "role": "system",
+        "content": "Persona B",
+    }
+
+
 def test_message_is_trimmed_before_send_and_store(client, provider):
     response = client.post(
         "/chat", json={"session_id": "s-trim", "message": "   padded   "}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -19,29 +20,79 @@ class ProviderHTTPError(Exception):
 
 
 class FakeProvider:
-    """Deterministic replacement for ``litellm.acompletion``."""
+    """Deterministic replacement for ``litellm.acompletion``.
+
+    It emulates LiteLLM's built-in cache: identical ``model`` + ``messages``
+    pairs return a copy of the first response marked with
+    ``_hidden_params={"cache_hit": True}``.  Requests carrying a ``cache``
+    mapping with ``no-cache`` / ``no-store`` bypass both the lookup and the
+    write, exactly like LiteLLM's documented bypass flags.
+    """
 
     def __init__(self) -> None:
         self.calls: list[dict] = []
+        self.upstream_calls: list[dict] = []
         self.reply = "Hello **world**."
         self.input_tokens = 42
         self.output_tokens = 9
         self.failures: dict[str, BaseException] = {}
+        self._cache: dict[str, tuple[str, int, int]] = {}
 
-    async def __call__(self, *, model, messages, api_key, timeout):
-        self.calls.append(
-            {"model": model, "messages": messages, "api_key": api_key, "timeout": timeout}
+    @staticmethod
+    def _cache_key(model: str, messages: list[dict]) -> str:
+        return json.dumps(
+            {"model": model, "messages": messages},
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
+
+    @staticmethod
+    def _response(
+        reply: str, input_tokens: int, output_tokens: int, *, cache_hit: bool
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=reply))],
+            usage=SimpleNamespace(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+            ),
+            _hidden_params={"cache_hit": cache_hit},
+        )
+
+    async def __call__(self, *, model, messages, api_key, timeout, cache=None):
+        self.calls.append(
+            {
+                "model": model,
+                "messages": messages,
+                "api_key": api_key,
+                "timeout": timeout,
+                "cache": cache,
+            }
+        )
+
+        bypass = bool(cache and (cache.get("no-cache") or cache.get("no-store")))
+        cache_key = self._cache_key(model, messages)
+
+        if not bypass and cache_key in self._cache:
+            reply, input_tokens, output_tokens = self._cache[cache_key]
+            return self._response(
+                reply, input_tokens, output_tokens, cache_hit=True
+            )
+
         failure = self.failures.get(api_key)
         if failure is not None:
             raise failure
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))],
-            usage=SimpleNamespace(
-                prompt_tokens=self.input_tokens,
-                completion_tokens=self.output_tokens,
-            ),
+
+        self.upstream_calls.append(
+            {"model": model, "messages": messages, "api_key": api_key}
         )
+        response = self._response(
+            self.reply, self.input_tokens, self.output_tokens, cache_hit=False
+        )
+        if not bypass:
+            self._cache[cache_key] = (self.reply, self.input_tokens, self.output_tokens)
+        return response
 
 
 @pytest.fixture
@@ -66,6 +117,7 @@ def make_client(
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:3000")
     monkeypatch.setenv("ENABLE_FAILURE_SIMULATION", "true" if simulation else "false")
     monkeypatch.setenv("CACHE_ENABLED", "true")
+    monkeypatch.setenv("LITELLM_CACHE_TYPE", "local")
     monkeypatch.setenv("LLM_REQUEST_TIMEOUT", "5")
 
     application = create_app(Settings.from_env())
